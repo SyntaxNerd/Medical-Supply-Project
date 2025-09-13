@@ -11,6 +11,10 @@ class DeliveryRequest(BaseModel):
 
 service = DeliveryService()
 
+@app.get("/")
+def root():
+    return {"message": "Medical Supply Project API is running!"}
+
 @app.post("/delivery")
 def calculate_delivery(request: DeliveryRequest):
     try:
