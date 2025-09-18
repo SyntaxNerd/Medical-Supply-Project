@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Drone Information</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-200 min-h-screen">
+  <div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-3xl font-bold text-center mb-8 text-indigo-400">🚁 Drone Information</h1>
+
+    <div id="drone-card" class="bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-700">
+      <!-- Drone info loads here -->
+    </div>
+  </div>
+
+  <script>
+    const API = "http://127.0.0.1:8000/deliveries";
+
+    // --- Stable drone ID generator (same as status.html) ---
+    function stableDroneId(seed) {
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) {
+        hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      return "DRN-" + (1000 + (hash >>> 0) % 9000);
+    }
+
+    // --- Drone catalog ---
+    const drones = {
+      short: {
+        type: "Short Distance Drone",
+        description: "Optimized for quick deliveries within 5–10 km. Lightweight and fast.",
+        appearance: "⚡ Compact body with blue stripes",
+        color: "Blue-White",
+        payload: "Up to 2kg"
+      },
+      medium: {
+        type: "Medium Distance Drone",
+        description: "Balanced drone for medium-range deliveries 10–25 km. Efficient and versatile.",
+        appearance: "🛩️ Medium frame with orange accents",
+        color: "Orange-Gray",
+        payload: "Up to 3.5kg"
+      },
+      long: {
+        type: "Long Distance Drone",
+        description: "Designed for remote hospitals and areas 25+ km away. Sturdy and reliable.",
+        appearance: "🚀 Large frame with reinforced rotors",
+        color: "Black-Gray",
+        payload: "Up to 5kg"
+      }
+    };
+
+    function getField(obj, ...keys) {
+      for (const k of keys) {
+        if (obj && Object.prototype.hasOwnProperty.call(obj, k) && obj[k] !== null && obj[k] !== undefined) {
+          return obj[k];
+        }
+      }
+      return null;
+    }
+
+    function safe(val, fallback = "-") {
+      return val === null || val === undefined ? fallback : String(val);
+    }
+
+    async function loadDroneInfo() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const droneIdParam = params.get("droneId");
+
+        const res = await fetch(API);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        let deliveries = await res.json();
+
+        if (!Array.isArray(deliveries)) {
+          if (deliveries?.data) deliveries = deliveries.data;
+          else if (deliveries?.deliveries) deliveries = deliveries.deliveries;
+          else deliveries = [];
+        }
+
+        // Match the correct delivery by stable ID
+        let assignedDelivery = null;
+        for (const d of deliveries) {
+          const seed = safe(getField(d, "area")) + safe(getField(d, "request_text"));
+          const generatedId = stableDroneId(seed);
+          if (generatedId === droneIdParam) {
+            assignedDelivery = d;
+            break;
+          }
+        }
+
+        if (!assignedDelivery) {
+          document.getElementById("drone-card").innerHTML =
+            `<p class="text-red-400">❌ Drone not found for ID: ${droneIdParam}</p>`;
+          return;
+        }
+
+        const distance = Number(getField(assignedDelivery, "distance_km", "distance")) || 0;
+
+        // Assign drone type based on distance
+        let droneInfo;
+        if (distance <= 10) droneInfo = drones.short;
+        else if (distance <= 25) droneInfo = drones.medium;
+        else droneInfo = drones.long;
+
+        const seed = safe(getField(assignedDelivery, "area")) + safe(getField(assignedDelivery, "request_text"));
+        const droneId = stableDroneId(seed);
+
+        // Simulated battery status linked to progress
+        const progress = Number(getField(assignedDelivery, "progress")) || 0;
+        const battery = (100 - Math.floor(progress / 2)) + "%"; // simple mapping
+
+        document.getElementById("drone-card").innerHTML = `
+          <h2 class="text-2xl font-semibold mb-4 text-indigo-300">${droneInfo.type}</h2>
+          <div class="space-y-3 text-gray-300">
+            <p><span class="font-semibold text-gray-200">Drone ID:</span> <span class="text-indigo-400">${droneId}</span></p>
+            <p><span class="font-semibold text-gray-200">Description:</span> ${droneInfo.description}</p>
+            <p><span class="font-semibold text-gray-200">Appearance:</span> ${droneInfo.appearance}</p>
+            <p><span class="font-semibold text-gray-200">Color:</span> ${droneInfo.color}</p>
+            <p><span class="font-semibold text-gray-200">Battery Status:</span> ${battery}</p>
+            <p><span class="font-semibold text-gray-200">Payload Capacity:</span> ${droneInfo.payload}</p>
+          </div>
+          <a href="delivery_status.html" 
+            class="mt-6 inline-block w-full text-center bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition">
+            🔙 Back to Status
+          </a>
+        `;
+      } catch (err) {
+        console.error("Error loading drone info:", err);
+        document.getElementById("drone-card").innerHTML =
+          `<p class="text-red-400">❌ Error loading drone information</p>`;
+      }
+    }
+
+    loadDroneInfo();
+  </script>
+</body>
+</html>

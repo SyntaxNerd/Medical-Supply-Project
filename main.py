@@ -6,6 +6,7 @@ import datetime
 import math
 from dotenv import load_dotenv
 
+# credentials   
 load_dotenv()
 openWeather_api_key = os.getenv("YOUR_OPENWEATHERMAP_KEY")
 tomtom_api_key = os.getenv("TOMTOM_API_KEY")
@@ -18,6 +19,13 @@ weather_encoder = joblib.load("weather_encoder.pkl")
 
 BASE_LAT, BASE_LON = 26.1445, 91.7362
 DRONE_SPEED_KM = 80
+
+# List of Assam districts/cities   
+ASSAM_LOCATIONS = [
+    "dibrugarh", "guwahati", "tezpur", "silchar", "nagaon",
+    "jorhat", "sivasagar", "barpeta", "golaghat", "teok",
+    "rangiya", "pathshala", "kokrajhar", "amingaon"
+]
 
 class DeliveryService:
     def haversine_distance(self, lat1, lon1, lat2, lon2):
@@ -38,9 +46,13 @@ class DeliveryService:
             data = response.json()
             if data.get("results"):
                 result = data["results"][0]
-                state = result.get("address", {}).get("countrySubdivision")
-                if state != "Assam":
+                # Check state
+                state = result.get("address", {}).get("countrySubdivision", "").lower()
+                city = result.get("address", {}).get("municipality", "").lower()
+                
+                if state != "assam" and city not in ASSAM_LOCATIONS:
                     return None, None
+
                 pos = result["position"]
                 return pos["lat"], pos["lon"]
         except:
@@ -100,8 +112,8 @@ class DeliveryService:
             data = response.json()
             if "routes" in data:
                 summary = data["routes"][0]["summary"]
-                travel_time = summary["travelTimeInSeconds"] / 3600
-                distance = summary["lengthInMeters"] / 1000
+                travel_time = summary["travelTimeInSeconds"] / 3600  # hours
+                distance = summary["lengthInMeters"] / 1000  # km
                 return travel_time, distance
         except:
             return None, None

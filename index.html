@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Medical Delivery Request</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  <style>
+    body {
+      background: radial-gradient(circle at top, #0f0c29, #302b63, #24243e);
+      min-height: 100vh;
+      overflow-x: hidden;
+      font-family: 'Inter', sans-serif;
+      color: white;
+    }
+
+    .floating-icon {
+      position: absolute;
+      width: 50px;
+      opacity: 0.7;
+      animation: float 10s linear infinite;
+    }
+
+    @keyframes float {
+      0% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-30px) rotate(15deg); }
+      100% { transform: translateY(0) rotate(0deg); }
+    }
+
+    .navbar {
+      backdrop-filter: blur(15px);
+      background-color: rgba(0,0,0,0.6);
+      z-index: 50;
+      box-shadow: 0 0 15px rgba(0,255,255,0.3);
+    }
+
+    .nav-link:hover {
+      color: #00ffff;
+      transform: scale(1.1);
+      transition: all 0.3s;
+    }
+
+    .form-card {
+      background-color: rgba(20,20,35,0.9);
+      border-radius: 1rem;
+      padding: 2.5rem;
+      box-shadow: 0 0 30px rgba(0,255,255,0.2);
+      backdrop-filter: blur(10px);
+      transition: transform 0.3s;
+    }
+
+    .form-card:hover {
+      transform: translateY(-10px);
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #00ffff;
+      box-shadow: 0 0 10px #00ffff;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+    }
+
+    .drone {
+      width: 80px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body class="relative flex flex-col items-center">
+
+  <!-- Floating icons -->
+  <img src="https://cdn-icons-png.flaticon.com/512/744/744465.png" class="floating-icon" style="top: 10%; left: 5%; animation-delay: 0s;">
+  <img src="https://cdn-icons-png.flaticon.com/512/744/744466.png" class="floating-icon" style="top: 20%; left: 80%; animation-delay: 2s;">
+  <img src="https://cdn-icons-png.flaticon.com/512/2838/2838891.png" class="floating-icon" style="top: 70%; left: 50%; animation-delay: 4s;">
+  <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="floating-icon" style="top: 60%; left: 20%; animation-delay: 1s;">
+
+  <!-- Navbar -->
+  <nav class="navbar w-full p-4 flex justify-center gap-10 fixed top-0">
+    <a href="#" class="nav-link text-lg font-semibold transition-colors">Home</a>
+    <a href="delivery_table.html" class="nav-link text-lg font-semibold transition-colors">All Deliveries</a>
+    <a href="delivery_status.html" class="nav-link text-lg font-semibold transition-colors">Live Status</a>
+  </nav>
+
+  <!-- Heading -->
+  <h1 id="main-heading" class="text-4xl font-bold mt-28 mb-8 text-cyan-400 text-center">🚑 Request Medical Item Delivery</h1>
+
+  <!-- Request Form -->
+  <div id="form-card" class="max-w-md w-full form-card shadow-lg">
+    <label class="block mb-2 font-semibold text-cyan-300">Request Text:</label>
+    <input id="request_text" type="text" class="w-full mb-4 bg-gray-900 border border-gray-700 text-white p-3 rounded" placeholder="e.g., Need blood urgently">
+
+    <label class="block mb-2 font-semibold text-cyan-300">Area Name:</label>
+    <input id="area_name" type="text" class="w-full mb-4 bg-gray-900 border border-gray-700 text-white p-3 rounded" placeholder="e.g., Dibrugarh">
+
+    <button id="submit-btn" onclick="submitDelivery()" class="w-full bg-cyan-500 text-white p-3 rounded-lg font-semibold hover:bg-cyan-600 transition-colors duration-300">Submit</button>
+
+    <p id="status" class="mt-4 text-center font-bold text-yellow-400"></p>
+  </div>
+
+  <!-- Drones -->
+  <img id="drone1" src="https://cdn-icons-png.flaticon.com/512/3180/3180151.png" class="drone">
+  <img id="drone2" src="https://cdn-icons-png.flaticon.com/512/4196/4196447.png" class="drone">
+  <img id="drone3" src="https://cdn-icons-png.flaticon.com/512/3294/3294560.png" class="drone">
+
+  <script>
+    const apiUrl = "http://localhost:8000/delivery";
+
+    async function submitDelivery() {
+      const request_text = document.getElementById("request_text").value;
+      const area_name = document.getElementById("area_name").value;
+      const statusEl = document.getElementById("status");
+
+      try {
+        const res = await fetch(apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ request_text, area: area_name })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.detail || "Failed to create delivery");
+
+        statusEl.innerText = "✅ Delivery request created successfully!";
+        document.getElementById("request_text").value = "";
+        document.getElementById("area_name").value = "";
+
+      } catch (err) {
+        statusEl.innerText = "❌ " + err.message;
+      }
+    }
+
+    // Anime.js animations
+    anime({
+      targets: '#main-heading',
+      translateY: [-50, 0],
+      opacity: [0, 1],
+      scale: [0.8, 1],
+      duration: 1200,
+      easing: 'easeOutElastic(1, .8)'
+    });
+
+    anime({
+      targets: '#form-card',
+      translateY: [30, 0],
+      opacity: [0, 1],
+      delay: 300,
+      duration: 1000,
+      easing: 'easeOutExpo'
+    });
+
+    anime({
+      targets: '.nav-link',
+      opacity: [0, 1],
+      translateY: [-10, 0],
+      delay: anime.stagger(200),
+      duration: 800,
+      easing: 'easeOutQuad'
+    });
+
+    // Floating icons animation
+    const icons = document.querySelectorAll('.floating-icon');
+    icons.forEach((icon, i) => {
+      anime({
+        targets: icon,
+        translateY: [0, -40, 0],
+        rotate: [0, 15, -15, 0],
+        translateX: [0, 20, -20, 0],
+        duration: 8000 + i * 500,
+        delay: i * 200,
+        easing: 'easeInOutSine',
+        loop: true
+      });
+    });
+
+    // Alternating drones with staggered start
+    const drones = [
+      {id:'#drone1', duration:12000, startTop:10, amplitude:5, direction:'ltr', delay:0},
+      {id:'#drone2', duration:14000, startTop:30, amplitude:7, direction:'rtl', delay:1000},
+      {id:'#drone3', duration:16000, startTop:50, amplitude:6, direction:'ltr', delay:2000}
+    ];
+
+    drones.forEach(d => {
+      let startX = d.direction === 'ltr' ? -150 : window.innerWidth + 150;
+      let endX = d.direction === 'ltr' ? window.innerWidth + 150 : -150;
+
+      const droneEl = document.querySelector(d.id);
+      droneEl.style.position = 'fixed';
+      droneEl.style.top = d.startTop + 'vh';
+      droneEl.style.left = '0px';
+
+      anime({
+        targets: d.id,
+        translateX: [startX, endX],
+        translateY: [
+          { value: d.startTop + d.amplitude, duration: 1000 },
+          { value: d.startTop - d.amplitude, duration: 1000 },
+          { value: d.startTop + d.amplitude, duration: 1000 },
+          { value: d.startTop - d.amplitude, duration: 1000 }
+        ],
+        easing: 'easeInOutSine',
+        duration: d.duration,
+        loop: true,
+        delay: d.delay
+      });
+    });
+  </script>
+</body>
+</html>

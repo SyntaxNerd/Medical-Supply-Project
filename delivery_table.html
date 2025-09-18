@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>All Deliveries</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-6">
+  <div class="max-w-6xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6 text-center text-cyan-400">🚚 All Deliveries</h1>
+
+    <div class="bg-gray-800 rounded-2xl p-6 shadow-lg">
+      <table class="min-w-full table-auto border-collapse">
+        <thead>
+          <tr class="bg-cyan-600 text-white">
+            <th class="py-3 px-4">#</th>
+            <th class="py-3 px-4">Request</th>
+            <th class="py-3 px-4">Destination</th>
+            <th class="py-3 px-4">Distance (km)</th>
+            <th class="py-3 px-4">Drone ETA</th>
+            <th class="py-3 px-4">Road ETA</th>
+            <th class="py-3 px-4">Priority</th>
+            <th class="py-3 px-4">Recommended</th>
+            <th class="py-3 px-4">Weather</th>
+            <th class="py-3 px-4">Traffic</th>
+          </tr>
+        </thead>
+        <tbody id="delivery-table-body" class="text-center text-gray-200">
+          <tr><td colspan="10" class="py-6">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const API = "http://127.0.0.1:8000/deliveries";
+
+    function getField(obj, ...keys) {
+      for (const k of keys) {
+        if (obj && Object.prototype.hasOwnProperty.call(obj, k) && obj[k] !== null && obj[k] !== undefined) {
+          return obj[k];
+        }
+      }
+      return null;
+    }
+
+    function safe(val, fallback = "-") {
+      if (val === null || val === undefined) return fallback;
+      return String(val);
+    }
+
+    async function fetchDeliveries() {
+      try {
+        const res = await fetch(API);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        let deliveries = await res.json();
+
+        if (!Array.isArray(deliveries)) {
+          if (deliveries && Array.isArray(deliveries.data)) deliveries = deliveries.data;
+          else if (deliveries && Array.isArray(deliveries.deliveries)) deliveries = deliveries.deliveries;
+          else deliveries = [];
+        }
+
+        const tbody = document.getElementById("delivery-table-body");
+        tbody.innerHTML = "";
+
+        if (deliveries.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="10" class="py-6 text-gray-400">No deliveries found.</td></tr>`;
+          return;
+        }
+
+        deliveries.forEach((d, idx) => {
+          const requestText = safe(getField(d, "request_text"));
+          const destination = safe(getField(d, "area"));
+          const distance = safe(getField(d, "distance_km", "distance"));
+          const droneEta = safe(getField(d, "drone_eta"));
+          const roadEta = safe(getField(d, "road_eta"));
+          const weather = safe(getField(d, "weather"), "Unknown");
+          const traffic = safe(getField(d, "traffic"), "Unknown");
+          const priority = safe(getField(d, "priority"), "N/A");
+          const recommendedMethod = safe(getField(d, "recommended_method"), "N/A");
+
+          const row = document.createElement("tr");
+          row.className = "hover:bg-gray-700 transition";
+          row.innerHTML = `
+            <td class="py-3 px-4 border border-gray-700">${idx + 1}</td>
+            <td class="py-3 px-4 border border-gray-700 text-left">${requestText}</td>
+            <td class="py-3 px-4 border border-gray-700">${destination}</td>
+            <td class="py-3 px-4 border border-gray-700">${distance}</td>
+            <td class="py-3 px-4 border border-gray-700">${droneEta}</td>
+            <td class="py-3 px-4 border border-gray-700">${roadEta}</td>
+            <td class="py-3 px-4 border border-gray-700">${priority}</td>
+            <td class="py-3 px-4 border border-gray-700">${recommendedMethod}</td>
+            <td class="py-3 px-4 border border-gray-700">${weather}</td>
+            <td class="py-3 px-4 border border-gray-700">${traffic}</td>
+          `;
+          tbody.appendChild(row);
+        });
+
+      } catch (err) {
+        console.error("Error fetching deliveries:", err);
+        const tbody = document.getElementById("delivery-table-body");
+        tbody.innerHTML = `<tr><td colspan="10" class="py-6 text-red-400">❌ Error fetching deliveries: ${err.message}</td></tr>`;
+      }
+    }
+
+    fetchDeliveries();
+    setInterval(fetchDeliveries, 5000);
+  </script>
+</body>
+</html>

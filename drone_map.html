@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Drone Tracker</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  <style>
+    #map { height: 450px; border-radius: 1rem; }
+    .leaflet-marker-icon { transition: transform 0.3s ease; }
+  </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center p-6">
+  <h1 class="text-3xl font-bold mb-6 text-cyan-400">🚁 Drone Live Tracker</h1>
+
+  <div id="map" class="w-full max-w-5xl shadow-lg"></div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6 w-full max-w-5xl">
+    <div class="bg-gray-800 rounded-2xl p-5 shadow-lg hover:shadow-cyan-500/40 transition">
+      <h2 class="text-lg font-semibold text-cyan-300">Drone ETA</h2>
+      <p id="droneEta" class="text-2xl font-bold mt-2">--</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl p-5 shadow-lg hover:shadow-cyan-500/40 transition">
+      <h2 class="text-lg font-semibold text-cyan-300">Road ETA</h2>
+      <p id="roadEta" class="text-2xl font-bold mt-2">--</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl p-5 shadow-lg hover:shadow-cyan-500/40 transition">
+      <h2 class="text-lg font-semibold text-cyan-300">Progress</h2>
+      <div class="w-full bg-gray-700 rounded-full h-4 mt-3">
+        <div id="progressBar" class="bg-cyan-400 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+    </div>
+    <div class="bg-gray-800 rounded-2xl p-5 shadow-lg hover:shadow-cyan-500/40 transition">
+      <h2 class="text-lg font-semibold text-cyan-300">Battery</h2>
+      <p id="battery" class="text-2xl font-bold mt-2">100%</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl p-5 shadow-lg hover:shadow-cyan-500/40 transition">
+      <h2 class="text-lg font-semibold text-cyan-300">Payload</h2>
+      <p id="payload" class="text-2xl font-bold mt-2">--</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl p-5 shadow-lg hover:shadow-cyan-500/40 transition">
+      <h2 class="text-lg font-semibold text-cyan-300">Weather</h2>
+      <p id="weather" class="text-2xl font-bold mt-2">--</p>
+    </div>
+    <div class="bg-gray-800 rounded-2xl p-5 shadow-lg hover:shadow-cyan-500/40 transition">
+      <h2 class="text-lg font-semibold text-cyan-300">Road Condition</h2>
+      <p id="obstacle" class="text-2xl font-bold mt-2">--</p>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const deliveryId = urlParams.get("id");
+
+    async function loadDelivery() {
+      if (!deliveryId) {
+        alert("No delivery ID provided in URL.");
+        return;
+      }
+
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/deliveries/${deliveryId}`);
+        if (!res.ok) throw new Error("Failed to fetch delivery");
+        const delivery = await res.json();
+
+        initMap(delivery);
+      } catch (err) {
+        console.error(err);
+        alert("Failed to load delivery data.");
+      }
+    }
+
+    function initMap(delivery) {
+      const map = L.map("map").setView([delivery.lat, delivery.lon], 8);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      const source = [26.1445, 91.7362];
+      const destination = [delivery.lat, delivery.lon];
+
+      // Markers
+      L.marker(source).addTo(map).bindPopup("📍 Source: Guwahati");
+      L.marker(destination).addTo(map).bindPopup(`📦 Destination: ${delivery.area}`);
+
+      // Polyline
+      const routeLine = L.polyline([source, destination], { color: "cyan", weight: 5, dashArray: "10, 10" }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+
+      // Drone icon
+      const droneIcon = L.icon({
+        iconUrl: "https://cdn-icons-png.flaticon.com/512/744/744465.png",
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+      });
+
+      const droneMarker = L.marker(source, { icon: droneIcon }).addTo(map).bindPopup("🚁 Drone");
+
+      // Drone animation
+      let progress = 0;
+      const totalSteps = 9000;
+      function animateDrone() {
+        if (progress <= 1) {
+          const lat = source[0] + (destination[0] - source[0]) * progress;
+          const lon = source[1] + (destination[1] - source[1]) * progress;
+          droneMarker.setLatLng([lat, lon]);
+          document.getElementById("progressBar").style.width = (progress * 100).toFixed(1) + "%";
+          progress += 1 / totalSteps;
+          requestAnimationFrame(animateDrone);
+        }
+      }
+      animateDrone();
+
+      // ETAs
+      document.getElementById("droneEta").innerText = `${delivery.drone_eta} mins`;
+      document.getElementById("roadEta").innerText = `${delivery.road_eta} mins`;
+
+      // Battery (slow drain)
+      let battery = 100;
+      const batteryInterval = setInterval(() => {
+        if (battery > 0 && progress < 1) {
+          battery -= 1; // Adjust to 5% in 10-15 mins
+          document.getElementById("battery").innerText = `${battery}%`;
+        }
+      }, 15000); // 15s per 1% drop, slows battery drain
+
+      // Payload (random)
+      const payload = Math.floor(Math.random() * 5) + 1; 
+      document.getElementById("payload").innerText = `${payload} kg`;
+
+      // Weather (simulated for demo)
+      const weatherOptions = ["🌤 Clear", "🌧 Rain", "🌩 Storm"];
+      const weather = weatherOptions[Math.floor(Math.random() * weatherOptions.length)];
+      document.getElementById("weather").innerText = weather;
+
+      // Obstacles / Road Condition (simulated)
+      const obstacleOptions = ["🛣 Clear", "🚧 Road Blocked", "⚠️ Slow Traffic"];
+      const obstacle = obstacleOptions[Math.floor(Math.random() * obstacleOptions.length)];
+      document.getElementById("obstacle").innerText = obstacle;
+    }
+
+    loadDelivery();
+  </script>
+</body>
+</html>

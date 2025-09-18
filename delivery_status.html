@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Delivery Status</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-200 min-h-screen">
+  <div class="max-w-6xl mx-auto p-6">
+    <h1 class="text-3xl font-bold text-center mb-8 text-indigo-400">📦 Delivery Status</h1>
+
+    <div class="grid md:grid-cols-2 gap-6" id="status-cards">
+      <!-- Cards load here -->
+    </div>
+  </div>
+
+  <script>
+    const API = "http://127.0.0.1:8000/deliveries";
+
+    // --- DRONE ID GENERATOR (Stable per delivery) ---
+    function stableDroneId(seed) {
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) {
+        hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      return "DRN-" + (1000 + (hash >>> 0) % 9000);
+    }
+
+    function safe(val, fallback = "-") {
+      return val === null || val === undefined ? fallback : String(val);
+    }
+
+    function getField(obj, ...keys) {
+      for (const k of keys) {
+        if (obj && Object.prototype.hasOwnProperty.call(obj, k) && obj[k] !== null && obj[k] !== undefined) {
+          return obj[k];
+        }
+      }
+      return null;
+    }
+
+    async function fetchDeliveries() {
+      try {
+        const res = await fetch(API);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        let deliveries = await res.json();
+
+        if (!Array.isArray(deliveries)) {
+          if (deliveries?.data) deliveries = deliveries.data;
+          else if (deliveries?.deliveries) deliveries = deliveries.deliveries;
+          else deliveries = [];
+        }
+
+        const container = document.getElementById("status-cards");
+        container.innerHTML = "";
+
+        if (deliveries.length === 0) {
+          container.innerHTML = `<p class="text-center text-gray-400">No active deliveries.</p>`;
+          return;
+        }
+
+        deliveries.forEach((d) => {
+          const requestText = safe(getField(d, "request_text"));
+          const destination = safe(getField(d, "area"));
+          const droneEta = safe(getField(d, "drone_eta"));
+          const roadEta = safe(getField(d, "road_eta"));
+          const method = safe(getField(d, "recommended_method"));
+          const priority = safe(getField(d, "priority"));
+          const weather = safe(getField(d, "weather"), "Unknown");
+          const traffic = safe(getField(d, "traffic"), "Unknown");
+
+          // Stable drone ID based on destination or request text
+          const seed = destination + requestText;
+          const droneId = stableDroneId(seed);
+
+          const card = document.createElement("div");
+          card.className = "bg-gray-800 rounded-2xl shadow-lg p-6 hover:shadow-2xl transition border border-gray-700";
+          card.innerHTML = `
+            <h2 class="text-xl font-semibold mb-3 text-indigo-300">📍 ${destination}</h2>
+            <div class="space-y-2 text-gray-300">
+              <p><span class="font-semibold text-gray-200">Request:</span> ${requestText}</p>
+              <p><span class="font-semibold text-gray-200">Priority:</span> ${priority}</p>
+              <p><span class="font-semibold text-gray-200">Weather:</span> ${weather} | <span class="font-semibold text-gray-200">Traffic:</span> ${traffic}</p>
+              <p><span class="font-semibold text-gray-200">Drone ETA:</span> ${droneEta}</p>
+              <p><span class="font-semibold text-gray-200">Road ETA:</span> ${roadEta}</p>
+              <p><span class="font-semibold text-gray-200">Recommended Method:</span> ${method}</p>
+              <p><span class="font-semibold text-gray-200">Assigned Drone:</span> <span class="text-indigo-400">${droneId}</span></p>
+            </div>
+            <div class="mt-4 flex gap-2">
+              <a href="drone_map.html?id=${d.id}" 
+                class="flex-1 text-center bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition">
+                Track Drone
+              </a>
+              <a href="drone_info.html?droneId=${droneId}" 
+                class="flex-1 text-center bg-cyan-500 text-white px-4 py-2 rounded-lg hover:bg-cyan-600 transition">
+                Drone Info
+              </a>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+
+      } catch (err) {
+        console.error("Error fetching deliveries:", err);
+        document.getElementById("status-cards").innerHTML = `<p class="text-center text-red-500">❌ Error fetching deliveries</p>`;
+      }
+    }
+
+    fetchDeliveries();
+    setInterval(fetchDeliveries, 5000);
+  </script>
+</body>
+</html>
